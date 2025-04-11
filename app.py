@@ -1,10 +1,12 @@
-from flask import Flask, render_template, redirect, url_for, session, flash, request
+from flask import Flask, render_template, redirect, url_for, session, flash, request, jsonify
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email, ValidationError
 import bcrypt
 import MySQLdb
 import MySQLdb.cursors
+from datetime import datetime
+import os
 
 app = Flask(__name__)
 
@@ -390,9 +392,30 @@ def documents():
 @app.route('/settings')
 def settings():
     if 'user_id' not in session:
-        flash('Please login first.')
+        flash('Please login to access settings.', 'warning')
         return redirect('/login')
-    return render_template('settings.html')
+    
+    try:
+        conn = get_db()
+        if not conn:
+            flash('Database connection error. Please try again later.', 'error')
+            return redirect('/login')
+
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE id = %s", (session['user_id'],))
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not user:
+            flash('User not found.', 'error')
+            return redirect('/login')
+        
+        return render_template('settings.html', current_user=user)
+    except Exception as e:
+        print(f"Settings error: {e}")
+        flash('An error occurred. Please try again.', 'error')
+        return redirect('/login')
 
 @app.route('/logout')
 def logout():
